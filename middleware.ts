@@ -1,5 +1,5 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { createMiddlewareClient, getClientIp } from '@/utils/supabase/middleware'
 
 // 🛡️ SecOps: Almacén temporal para Rate Limiting (en memoria)
 // NOTA: En producción con escalado horizontal se usaría Redis (Upstash).
@@ -10,15 +10,9 @@ const RATE_LIMIT_THRESHOLD = 5 // Máximo 5 intentos
 const RATE_LIMIT_WINDOW = 60 * 1000 // por minuto (60000ms)
 
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
-
   // 1. 🛡️ SecOps: Mitigación de Fuerza Bruta (Rate Limiting)
-  const ip = request.ip ?? '127.0.0.1'
-  const isAuthAction = request.nextUrl.pathname.startsWith('/auth') || 
+  const ip = getClientIp(request)
+  const isAuthAction = request.nextUrl.pathname.startsWith('/auth') ||
                        (request.nextUrl.pathname === '/login' && request.method === 'POST')
 
   if (isAuthAction) {
@@ -45,29 +39,10 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({ request: { headers: request.headers } })
-          response.cookies.set({ name, value, ...options })
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({ request: { headers: request.headers } })
-          response.cookies.set({ name, value: '', ...options })
-        },
-      },
-    }
-  )
+  const { supabase, getResponse } = createMiddlewareClient(request)
 
   const { data: { user } } = await supabase.auth.getUser()
+  const response = getResponse()
 
   // 🛡️ SecOps: Protección Perimetral
   if (!user && request.nextUrl.pathname.startsWith('/catalog')) {
