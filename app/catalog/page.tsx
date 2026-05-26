@@ -1,77 +1,67 @@
 import { createClient } from '@/utils/supabase/server'
-import { signout } from '@/app/auth/actions'
+import { requireAuth } from '@/app/data/auth'
+import { AppHeader } from '@/app/components/app-header'
+import { SongCard } from '@/app/components/song-card'
+import { EmptyState } from '@/app/components/empty-state'
+import type { Metadata } from 'next'
 
-export default async function CatalogPage(props: {
+export const metadata: Metadata = { title: 'Catálogo' }
+
+type CatalogPageProps = {
   searchParams: Promise<{ q?: string }>
-}) {
-  const searchParams = await props.searchParams;
+}
+
+export default async function CatalogPage({ searchParams }: CatalogPageProps) {
+  const user = await requireAuth()
+
+  const { q } = await searchParams
   const supabase = await createClient()
-  const query = searchParams.q || ''
 
-  // 🛡️ SecOps: Mitigación de SQL Injection (SQLi)
-  // Usamos el cliente de Supabase que parametriza automáticamente las consultas.
-  // JAMÁS concatenamos strings en la query.
-  let dbQuery = supabase
-    .from('music_catalog')
-    .select('*')
+  // 🛡️ Fix SQLi: sanitize query before interpolating into .or() filter string.
+  // Supabase SDK parametrizes bound values but NOT the filter-string syntax itself.
+  // Strip characters that could escape the ilike value and inject new filter clauses.
+  const rawQuery = q ?? ''
+  const safeQuery = rawQuery.replace(/[%,()'"\\]/g, '').slice(0, 100).trim()
 
-  if (query) {
-    dbQuery = dbQuery.or(`title.ilike.%${query}%,artist.ilike.%${query}%,genre.ilike.%${query}%`)
+  let dbQuery = supabase.from('music_catalog').select('*')
+
+  if (safeQuery) {
+    dbQuery = dbQuery.or(
+      `title.ilike.%${safeQuery}%,artist.ilike.%${safeQuery}%,genre.ilike.%${safeQuery}%`
+    )
   }
 
-  const { data: songs, error } = await dbQuery.order('title', { ascending: true })
+  const { data: songs } = await dbQuery.order('title', { ascending: true })
 
   return (
-    <div className="flex-1 w-full flex flex-col gap-8 items-center p-8 bg-zinc-50 dark:bg-black min-h-screen">
-      <nav className="w-full flex justify-between items-center max-w-5xl border-b pb-4">
-        <h1 className="text-2xl font-bold text-indigo-600">Secure Music Cloud</h1>
-        <form action={signout}>
-          <button className="px-4 py-2 rounded-md bg-zinc-200 hover:bg-zinc-300 transition-colors text-sm font-medium">
-            Cerrar Sesión
-          </button>
-        </form>
-      </nav>
+    <>
+      <AppHeader
+        userEmail={user?.email}
+        resultCount={songs?.length ?? 0}
+      />
 
-      <div className="w-full max-w-5xl flex flex-col gap-6">
-        <section className="flex flex-col gap-4">
-          <h2 className="text-xl font-semibold">Explorar Catálogo</h2>
-          <form className="flex gap-2">
-            <input
-              type="text"
-              name="q"
-              placeholder="Buscar por título, artista o género..."
-              defaultValue={query}
-              className="flex-1 px-4 py-2 rounded-md border focus:ring-2 focus:ring-indigo-500 outline-none"
-            />
-            <button className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
-              Buscar
-            </button>
-          </form>
-        </section>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {songs?.map((song) => (
-            <div 
-              key={song.id} 
-              className="p-4 bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <h3 className="font-bold text-lg truncate">{song.title}</h3>
-              <p className="text-zinc-600 dark:text-zinc-400">{song.artist}</p>
-              <div className="mt-4 flex justify-between items-center text-sm">
-                <span className="px-2 py-1 bg-indigo-50 text-indigo-700 rounded-md font-medium uppercase tracking-wider text-xs">
-                  {song.genre}
-                </span>
-                <span className="text-zinc-500">{song.year}</span>
-              </div>
-            </div>
-          ))}
-          {songs?.length === 0 && (
-            <p className="col-span-full text-center py-12 text-zinc-500">
-              No se encontraron canciones que coincidan con tu búsqueda.
+      <main id="main" className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {/* Library header */}
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Tu biblioteca</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {songs?.length ?? 0}{' '}
+              {(songs?.length ?? 0) === 1 ? 'canción' : 'canciones'}
+              {safeQuery && ` · "${safeQuery}"`}
             </p>
+          </div>
+        </div>
+
+        {/* Grid */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+          {songs && songs.length > 0 ? (
+            songs.map((song) => <SongCard key={song.id} song={song} />)
+          ) : (
+            <EmptyState query={safeQuery || undefined} />
           )}
         </div>
-      </div>
-    </div>
+      </main>
+    </>
   )
 }

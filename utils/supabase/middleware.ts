@@ -1,8 +1,9 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export function createMiddlewareClient(request: NextRequest) {
-  let response = NextResponse.next({ request: { headers: request.headers } })
+export function createMiddlewareClient(request: NextRequest, requestHeaders?: Headers) {
+  const hdrs = requestHeaders ?? request.headers
+  let response = NextResponse.next({ request: { headers: hdrs } })
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,12 +13,12 @@ export function createMiddlewareClient(request: NextRequest) {
         get: (name) => request.cookies.get(name)?.value,
         set: (name, value, options: CookieOptions) => {
           request.cookies.set({ name, value, ...options })
-          response = NextResponse.next({ request: { headers: request.headers } })
+          response = NextResponse.next({ request: { headers: hdrs } })
           response.cookies.set({ name, value, ...options })
         },
         remove: (name, options: CookieOptions) => {
           request.cookies.set({ name, value: '', ...options })
-          response = NextResponse.next({ request: { headers: request.headers } })
+          response = NextResponse.next({ request: { headers: hdrs } })
           response.cookies.set({ name, value: '', ...options })
         },
       },
