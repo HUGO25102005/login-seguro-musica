@@ -1,12 +1,11 @@
 import { createClient } from '@/utils/supabase/server'
 import { signout } from '@/app/auth/actions'
 
-export default async function CatalogPage({
-  searchParams,
-}: {
-  searchParams: { q?: string }
+export default async function CatalogPage(props: {
+  searchParams: Promise<{ q?: string }>
 }) {
-  const supabase = createClient()
+  const searchParams = await props.searchParams;
+  const supabase = await createClient()
   const query = searchParams.q || ''
 
   // 🛡️ SecOps: Mitigación de SQL Injection (SQLi)
