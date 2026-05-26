@@ -1,8 +1,9 @@
 import { createClient } from '@/utils/supabase/server'
-import { requireAuth } from '@/app/data/auth'
+import { requireAuth, isAdmin } from '@/app/data/auth'
 import { AppHeader } from '@/app/components/app-header'
 import { SongCard } from '@/app/components/song-card'
 import { EmptyState } from '@/app/components/empty-state'
+import { CreateSongDialog } from '@/app/components/create-song-dialog'
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = { title: 'Catálogo' }
@@ -13,6 +14,7 @@ type CatalogPageProps = {
 
 export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const user = await requireAuth()
+  const admin = await isAdmin(user.id)
 
   const { q } = await searchParams
   const supabase = await createClient()
@@ -51,6 +53,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
               {safeQuery && ` · "${safeQuery}"`}
             </p>
           </div>
+          {admin && <CreateSongDialog />}
         </div>
 
         {/* Grid */}
@@ -58,7 +61,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
           {songs && songs.length > 0 ? (
             songs.map((song) => <SongCard key={song.id} song={song} />)
           ) : (
-            <EmptyState query={safeQuery || undefined} />
+            <EmptyState query={safeQuery || undefined} isAdmin={admin} />
           )}
         </div>
       </main>

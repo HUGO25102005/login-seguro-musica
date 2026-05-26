@@ -16,3 +16,13 @@ export const requireAuth = async () => {
   if (!user) redirect('/login')
   return user
 }
+
+export const isAdmin = cache(async (userId: string) => {
+  const supabase = await createClient()
+  const { data } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('user_id', userId)
+    .maybeSingle()
+  return data?.role === 'admin'
+})

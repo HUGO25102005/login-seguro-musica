@@ -12,6 +12,7 @@ export type AuditEvent =
   | 'RATE_LIMIT_HIT'
   | 'AUTH_CALLBACK_ERROR'
   | 'UNAUTHORIZED_ACCESS'
+  | 'SONG_CREATED'
 
 interface AuditEntry {
   event: AuditEvent
