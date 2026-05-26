@@ -1,6 +1,8 @@
+import { redirect } from 'next/navigation'
+import { createClient } from '@/utils/supabase/server'
 import { updatePassword } from '@/app/auth/actions'
 import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/submit-button'
 import { PasswordInput } from '@/components/password-input'
 import { AlertCircle } from 'lucide-react'
 import type { Metadata } from 'next'
@@ -10,6 +12,12 @@ export const metadata: Metadata = { title: 'Nueva contraseña' }
 export default async function ResetConfirmPage(props: {
   searchParams: Promise<{ error?: string }>
 }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) {
+    redirect('/auth/reset?error=' + encodeURIComponent('Enlace inválido o expirado.'))
+  }
+
   const searchParams = await props.searchParams
 
   return (
@@ -52,9 +60,9 @@ export default async function ResetConfirmPage(props: {
               minLength={8}
             />
           </div>
-          <Button type="submit" formAction={updatePassword} className="w-full h-11">
+          <SubmitButton formAction={updatePassword} pendingText="Actualizando…">
             Actualizar contraseña
-          </Button>
+          </SubmitButton>
         </form>
       </div>
     </main>

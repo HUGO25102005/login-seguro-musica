@@ -30,14 +30,14 @@ export async function proxy(request: NextRequest) {
   requestHeaders.set('x-nonce', nonce)
   requestHeaders.set('Content-Security-Policy', cspHeader)
 
-  // Rate limiting — reads real IP from x-forwarded-for/x-real-ip (C-01)
+  // Rate limiting — key prefix edge|ip|<ip> distinct from server-action keys (C-01)
   const ip = getClientIp(request)
   const isAuthAction =
     request.nextUrl.pathname.startsWith('/auth') ||
     (request.nextUrl.pathname === '/login' && request.method === 'POST')
 
   if (isAuthAction) {
-    const result = await rateLimiter.check(ip)
+    const result = await rateLimiter.check(`edge|ip|${ip}`)
     if (!result.success) {
       auditLog({ event: 'RATE_LIMIT_HIT', ip })
       return new NextResponse(
@@ -61,11 +61,25 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser()
   const response = getResponse()
 
-  // Auth guard for protected routes
-  if (!user && request.nextUrl.pathname.startsWith('/catalog')) {
-    auditLog({ event: 'UNAUTHORIZED_ACCESS', ip, metadata: { path: request.nextUrl.pathname } })
+  // Auth guards
+  const PROTECTED = ['/catalog', '/profile', '/settings']
+  const AUTH_PAGES = ['/login', '/auth/reset']  // /auth/reset/confirm intentionally excluded
+  const path = request.nextUrl.pathname
+  const isProtected = PROTECTED.some(p => path === p || path.startsWith(`${p}/`))
+  const isAuthPage  = AUTH_PAGES.some(p => path === p || path.startsWith(`${p}/`))
+
+  if (!user && isProtected) {
+    auditLog({ event: 'UNAUTHORIZED_ACCESS', ip, metadata: { path } })
     const url = request.nextUrl.clone()
-    url.pathname = '/'
+    url.pathname = '/login'
+    url.searchParams.set('next', path)
+    return NextResponse.redirect(url)
+  }
+
+  if (user && isAuthPage) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/catalog'
+    url.search = ''
     return NextResponse.redirect(url)
   }
 

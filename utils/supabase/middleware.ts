@@ -28,9 +28,14 @@ export function createMiddlewareClient(request: NextRequest, requestHeaders?: He
   return { supabase, getResponse: () => response }
 }
 
-// request.ip fue removido en Next 15+; leer de headers estándar de proxy
+// CWE-348: prefer Vercel's trusted header over client-forgeable x-forwarded-for.
+// Set TRUST_PROXY=1 only for self-hosted deployments behind a controlled proxy.
 export function getClientIp(request: NextRequest): string {
-  const fwd = request.headers.get('x-forwarded-for')
-  if (fwd) return fwd.split(',')[0].trim()
+  const vercel = request.headers.get('x-vercel-forwarded-for')
+  if (vercel) return vercel.split(',')[0].trim()
+  if (process.env.TRUST_PROXY === '1') {
+    const fwd = request.headers.get('x-forwarded-for')
+    if (fwd) return fwd.split(',')[0].trim()
+  }
   return request.headers.get('x-real-ip') ?? '127.0.0.1'
 }

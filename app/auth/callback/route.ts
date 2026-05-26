@@ -2,7 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { NextResponse } from 'next/server'
 import { auditLog } from '@/app/lib/audit-logger'
 
-const ALLOWED_REDIRECT_PATHS = ['/catalog', '/profile', '/settings']
+const ALLOWED_REDIRECT_PATHS = ['/catalog', '/profile', '/settings', '/auth/reset/confirm']
 
 const isSafeRedirect = (path: string): boolean =>
   ALLOWED_REDIRECT_PATHS.some(

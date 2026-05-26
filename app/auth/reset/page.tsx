@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { resetPassword } from '@/app/auth/actions'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/submit-button'
 import { AlertCircle, CheckCircle, ArrowLeft } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -57,9 +57,9 @@ export default async function ResetPasswordPage(props: {
               required
             />
           </div>
-          <Button type="submit" formAction={resetPassword} className="w-full h-11">
+          <SubmitButton formAction={resetPassword} pendingText="Enviando…">
             Enviar enlace
-          </Button>
+          </SubmitButton>
         </form>
       </div>
     </main>
